@@ -157,20 +157,24 @@ ${food.location.toLowerCase() === userCity.toLowerCase() ? '<span class="nearbyB
 <button class="mapBtn">🗺 View on Map</button>
 </a>
 
+<button class="reserveBtn" onclick="reserveFood()">Reserve Food</button>
 `;
 
-                                container.appendChild(card);
+container.appendChild(card);
 
-                        });
+});
 
-                }
+}
 
-                loadFood();
+loadFood();
 
+function reserveFood(){
 
+alert("Pickup request sent to donor for verification");
 
-        </script>
+}
+
+</script>
 
 </body>
-
 </html>

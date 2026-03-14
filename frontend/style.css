@@ -256,5 +256,21 @@ button:hover {
 .phoneLink:hover {
 
     text-decoration: underline;
+}
 
+.reserveBtn {
+
+    background: #ff9800;
+    color: white;
+    border: none;
+    padding: 10px 14px;
+    border-radius: 8px;
+    margin-bottom: 8px;
+    cursor: pointer;
+
+}
+
+.reserveBtn:hover {
+
+    background: #e85a2b;
 }

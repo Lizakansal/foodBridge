@@ -1,0 +1,260 @@
+body {
+
+    margin: 0;
+    font-family: Arial;
+    background-image: url("https://images.unsplash.com/photo-1504674900247-0877df9cc836");
+    background-size: cover;
+    background-position: center;
+    min-height: 100;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+}
+
+.overlay {
+
+    background: rgba(0, 0, 0, 0.55);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 40px 20px;
+    box-sizing: border-box;
+
+}
+
+.hero {
+
+    text-align: center;
+    color: white;
+    margin-top: 0px;
+    margin-bottom: 3px;
+
+}
+
+h1 {
+
+    margin: 0;
+    font-size: 42px;
+
+}
+
+.tagline {
+
+    margin-top: 5px;
+    font-size: 16px;
+
+}
+
+.card {
+
+    width: 450px;
+    background: white;
+    padding: 25px;
+    border-radius: 15px;
+    margin-right: 20px;
+    box-shadow: 0 10px 30px rgba(29, 6, 6, 0.3);
+    box-sizing: border-box;
+}
+
+input {
+
+    width: 100%;
+    padding: 12px;
+    margin: 10px 0;
+    border-radius: 8px;
+    border: 1px solid #ccc;
+    font-size: 14px;
+    text-align: border-box;
+    display: block;
+    box-sizing: border-box;
+}
+
+button {
+
+    width: 100%;
+    padding: 13px;
+
+    margin-top: 10px;
+
+    border: none;
+    border-radius: 8px;
+
+    background: #ff6b35;
+
+    color: white;
+
+    font-size: 16px;
+
+    cursor: pointer;
+
+    transition: 0.3s;
+
+}
+
+button:hover {
+
+    background: #e85a2b;
+    transform: scale(1.03);
+
+}
+
+.typeSelector {
+
+    display: flex;
+    justify-content: center;
+    gap: 30px;
+
+    margin-bottom: 10px;
+
+    color: black;
+
+}
+
+.typeSelector label {
+
+    font-weight: bold;
+    cursor: pointer;
+
+}
+
+.container {
+
+    text-align: center;
+    color: white;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+
+}
+
+.homeButtons {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.foodGrid {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 20px;
+
+    width: 90%;
+    margin-top: 20px;
+
+}
+
+.foodCard {
+
+    background: white;
+
+    padding: 20px;
+    width: 90%;
+    border-radius: 12px;
+
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+
+    color: #333;
+
+}
+
+.urgentFood {
+    border-left: 20px solid red;
+    background: #ffe5e5;
+}
+
+.mediumFood {
+    border-left: 20px solid orange;
+    background: #fff4d6;
+}
+
+.safeFood {
+    border-left: 20px solid green;
+    background: #e8ffe8;
+}
+
+.foodCard h3 {
+
+    margin-top: 0;
+
+    color: #ff6b35;
+
+}
+
+.callBtn {
+    background: #27ae60;
+    margin-top: 10px;
+}
+
+.mapBtn {
+    background: #2d9cdb;
+    margin-top: 10px;
+}
+
+.phoneLink {
+    color: #397fd5;
+    font-weight: bold;
+    text-decoration: none;
+}
+
+.phoneLink:hover {
+    text-decoration: underline;
+}
+
+.nearbyBadge {
+
+    background: #28a745;
+    color: white;
+    padding: 4px 10px;
+    border-radius: 10px;
+    font-size: 12px;
+    display: inline-block;
+    margin-bottom: 8px;
+
+}
+
+.mapContainer iframe {
+    border-radius: 12px;
+}
+
+.foodCard {
+
+    background: white;
+    padding: 18px;
+    border-radius: 12px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+
+}
+
+.foodCard:hover {
+
+    transform: translateY(-4px);
+    box-shadow: 0 8px 18px rgba(0, 0, 0, 0.15);
+
+}
+
+.foodCard h3 {
+
+    color: #ff6b35;
+    margin-bottom: 8px;
+
+}
+
+.phoneLink {
+
+    color: #2d89ef;
+    text-decoration: none;
+    font-weight: 600;
+
+}
+
+.phoneLink:hover {
+
+    text-decoration: underline;
+
+}

@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+
+    <title>FoodBridge</title>
+
+    <link rel="stylesheet" href="style.css">
+
+</head>
+
+<body>
+
+    <div class="overlay">
+
+        <div class="container">
+            <div class="hero">
+                <h1>Donate Food. Save Lives.</h1>
+
+                <p class="tagline">
+                    A small act of kindness can feed someone in need
+                </p>
+            </div>
+
+            <div class="card">
+
+                <form id="foodForm">
+
+                    <div class="typeSelector">
+
+                        <label>
+                            <input type="radio" name="type" value="Veg" checked>
+                            🍀 Veg
+                        </label>
+
+                        <label>
+                            <input type="radio" name="type" value="NonVeg">
+                            🍗 Non-Veg
+                        </label>
+
+                    </div>
+
+                    <input type="text" id="donorName" placeholder="Donor Name" required>
+
+                    <input type="text" id="foodName" placeholder="Food Name" required>
+
+                    <input type="text" id="quantity" placeholder="Quantity / Servings" required>
+
+                    <label
+                        style="font-size: 14px; color: #444; display: block; margin-bottom: 5px; text-align: left; font-weight: bold;">
+                        Food Expiry Date & Time:
+                    </label>
+                    <input type="datetime-local" id="expiryTime" required
+                        style="width: 100%; padding: 10px; margin-bottom: 15px; border: 1px solid #ccc; border-radius: 5px;">
+                    <p style="font-size: 11px; color: #666; margin-top: -10px; margin-bottom: 15px; text-align: left;">
+                        *Select exactly when this food will become unsafe to eat.
+                    </p>
+
+                    <input type="text" id="location" placeholder="City / Area" required>
+
+                    <input type="text" id="address" placeholder="Detailed Address" required>
+
+                    <input type="text" id="contact" placeholder="Contact Number" required>
+
+                    <button type="submit">Donate Food</button>
+
+                </form>
+
+            </div>
+
+        </div>
+
+    </div>
+
+    <script>
+
+        document.getElementById("foodForm").addEventListener("submit", async function (e) {
+
+            e.preventDefault();
+
+            const type = document.querySelector('input[name="type"]:checked').value;
+
+            const food = {
+
+                type: type,
+                donorName: document.getElementById("donorName").value,
+                foodName: document.getElementById("foodName").value,
+                quantity: document.getElementById("quantity").value,
+                expiryTime: document.getElementById("expiryTime").value,
+                location: document.getElementById("location").value,
+                address: document.getElementById("address").value,
+                contact: document.getElementById("contact").value
+
+            };
+
+            await fetch("http://localhost:5000/add-food", {
+
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(food)
+
+            });
+
+            alert("Food donated successfully!");
+
+        });
+
+    </script>
+
+</body>
+
+</html>

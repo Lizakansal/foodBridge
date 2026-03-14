@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+        <title>Find Food - FoodBridge</title>
+        <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+        <div class="overlay">
+
+                <div class="container">
+
+                        <div class="hero">
+                                <h1>Available Food</h1>
+                                <p class="tagline">Find food donations near you</p>
+                        </div>
+                        <div class="mapContainer">
+
+                                <iframe width="100%" height="250" style="border:0" loading="lazy" allowfullscreen
+                                        src="https://maps.google.com/maps?q=india&t=&z=5&ie=UTF8&iwloc=&output=embed">
+                                </iframe>
+
+                        </div>
+                        <div id="foodList" class="foodGrid">
+
+                        </div>
+
+                </div>
+
+        </div>
+
+        <script>
+                let userCity = "";
+
+                async function getUserLocation() {
+
+                        return new Promise((resolve, reject) => {
+
+                                navigator.geolocation.getCurrentPosition(async function (position) {
+
+                                        const lat = position.coords.latitude;
+                                        const lon = position.coords.longitude;
+
+                                        const map = document.querySelector("iframe");
+                                        map.src = `https://maps.google.com/maps?q=${lat},${lon}&z=14&output=embed`;
+
+                                        try {
+
+                                                const geoResponse = await fetch(
+                                                        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`
+                                                );
+
+                                                const geoData = await geoResponse.json();
+
+                                                userCity =
+                                                        geoData.address.city ||
+                                                        geoData.address.town ||
+                                                        geoData.address.state ||
+                                                        "";
+
+                                                resolve();
+
+                                        } catch (err) {
+
+                                                resolve();
+
+                                        }
+
+                                });
+
+                        });
+
+                }
+                function capitalizeFirst(text) {
+                        if (!text) return "";
+                        return text.charAt(0).toUpperCase() + text.slice(1);
+                }
+
+                async function loadFood() {
+
+                        await getUserLocation();
+
+                        const response = await fetch("http://localhost:5000/foods");
+                        const foods = await response.json();
+                        const currentTime = new Date();
+
+                        foods.sort((a, b) => {
+                                const userCityLower = (userCity || "").toLowerCase();
+                                const cityA = (a.location || "").toLowerCase();
+                                const cityB = (b.location || "").toLowerCase();
+
+                                const expiryA = new Date(a.expiryTime);
+                                const expiryB = new Date(b.expiryTime);
+
+                                if (cityA === userCityLower && cityB !== userCityLower) return -1;
+                                if (cityA !== userCityLower && cityB === userCityLower) return 1;
+
+                                if (expiryA < expiryB) return -1;
+                                if (expiryA > expiryB) return 1;
+
+                                return cityA.localeCompare(cityB);
+
+                        });
+
+                        const container = document.getElementById("foodList");
+                        container.innerHTML = "";
+
+                        foods.forEach(food => {
+                                const expiryDate = new Date(food.expiryTime);
+                                if (expiryDate < currentTime) return;
+
+                                const diffMs = expiryDate - currentTime;
+                                const hours = Math.floor(diffMs / (1000 * 60 * 60));
+                                const mins = Math.round((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+                                let urgencyClass = "safeFood";
+
+                                if (hours <= 1) {
+                                        urgencyClass = "urgentFood";
+                                }
+                                else if (hours <= 3) {
+                                        urgencyClass = "mediumFood";
+                                }
+                                const card = document.createElement("div");
+                                card.className = `foodCard ${urgencyClass}`;
+                                const isNearby = food.location.toLowerCase() === userCity.toLowerCase();
+
+                                const mapAddress = encodeURIComponent(food.address + ", " + food.location);
+
+                                card.innerHTML = `
+
+<h3>${capitalizeFirst(food.foodName)}</h3>
+${food.location.toLowerCase() === userCity.toLowerCase() ? '<span class="nearbyBadge">Nearby</span>' : ''}
+
+<p><b>Type:</b> ${capitalizeFirst(food.type)}</p>
+
+<p><b>Donor:</b> ${capitalizeFirst(food.donorName)}</p>
+
+<p><b>Quantity:</b> ${food.quantity}</p>
+
+<p><b>Expires in:</b> ${hours} hr ${mins} min</p>
+
+<p><b>Location:</b> ${capitalizeFirst(food.location)}</p>
+
+<p><b>Address:</b> ${capitalizeFirst(food.address)}</p>
+
+<p><b>Contact:</b>
+<a href="tel:${food.contact}" class="phoneLink">${food.contact}</a>
+</p>
+
+<a href="tel:${food.contact}">
+<button class="callBtn">📞 Call Donor</button>
+</a>
+
+<a href="https://www.google.com/maps/search/${mapAddress}" target="_blank">
+<button class="mapBtn">🗺 View on Map</button>
+</a>
+
+`;
+
+                                container.appendChild(card);
+
+                        });
+
+                }
+
+                loadFood();
+
+
+
+        </script>
+
+</body>
+
+</html>

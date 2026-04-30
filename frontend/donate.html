@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+
+  <title>FoodBridge</title>
+
+  <link rel="stylesheet" href="style.css">
+
+</head>
+
+<body>
+
+  <div class="overlay">
+
+    <div class="container">
+      <div class="hero">
+        <h1>Donate Food. Save Lives.</h1>
+
+        <p class="tagline">
+          A small act of kindness can feed someone in need
+        </p>
+      </div>
+
+      <div class="card">
+
+        <form id="foodForm">
+
+          <div class="typeSelector">
+
+            <label>
+              <input type="radio" name="type" value="Veg" checked>
+              🍀 Veg
+            </label>
+
+            <label>
+              <input type="radio" name="type" value="NonVeg">
+              🍗 Non-Veg
+            </label>
+
+          </div>
+
+          <input type="text" id="donorName" placeholder="Donor Name" required>
+
+          <input type="text" id="foodName" placeholder="Food Name" required>
+
+          <div style="display: flex; gap: 10px; margin-bottom: 15px;">
+  <input type="number" id="quantity" placeholder="Quantity" required style="margin-bottom: 0; flex: 1; padding: 10px; border: 1px solid #ccc; border-radius: 5px; font-size: 16px;">
+  <select id="quantityUnit" required style="padding: 10px; border: 1px solid #ccc; border-radius: 5px; background: white; font-size: 16px; width: 120px;">
+    <option value="Servings">Servings</option>
+    <option value="kg">kg</option>
+    <option value="g">grams</option>
+    <option value="L">Litres</option>
+    <option value="Packets">Packets</option>
+    <option value="Items">Items</option>
+  </select>
+</div>
+
+          <input type="datetime-local" id="expiryTime" required>
+
+          <input type="text" id="area" placeholder="Area/Landmark" required>
+
+          <input type="text" id="location" placeholder="City" required>
+
+          <input type="text" id="contact" placeholder="Contact Number" required>
+
+          <input type="email" id="mail" placeholder="Email ID(required)" required>
+          <button type="submit">Donate Food</button>
+
+        </form>
+
+      </div>
+      <div class="card" style="margin-top: 40px; text-align: left;">
+        <h2 style="color: #28a745;">💖 Impact Wall</h2>
+        <p style="color: #666; margin-bottom: 20px;">See what our wonderful donors have contributed recently.</p>
+        <div id="donatedList" style="display: flex; flex-direction: column; gap: 15px;">
+           <!-- Donated items will go here -->
+        </div>
+      </div>
+
+    </div>
+
+  </div>
+
+  <script>
+
+    document.getElementById("foodForm").addEventListener("submit", async function (e) {
+
+      e.preventDefault();
+
+      const type = document.querySelector('input[name="type"]:checked').value;
+
+
+      const area = document.getElementById("area").value;
+      const location = document.getElementById("location").value;
+
+      const fullAddress = encodeURIComponent(area + ", " + location + ", India");
+
+      const geoResponse = await fetch(
+        `https://nominatim.openstreetmap.org/search?format=json&q=${fullAddress}`
+      );
+
+      const geoData = await geoResponse.json();
+
+      let lat = 0;
+      let lng = 0;
+
+      if (geoData.length > 0) {
+        lat = geoData[0].lat;
+        lng = geoData[0].lon;
+      }
+      else {
+        console.log("Geocoding failed, using default");
+        lat = 0;
+        lng = 0;
+      }
+
+      console.log("LAT LNG:", lat, lng);
+
+      const address = area + ", " + location;
+      const food = {
+        type: type,
+        donorName: document.getElementById("donorName").value,
+        foodName: document.getElementById("foodName").value,
+        quantity: document.getElementById("quantity").value + " " + document.getElementById("quantityUnit").value,
+        expiryTime: document.getElementById("expiryTime").value,
+        area: area,
+        location: location,
+        address: address,
+        contact: document.getElementById("contact").value,
+        email: document.getElementById("mail").value,
+        lat: lat,
+        lng: lng
+
+
+      };
+
+      await fetch("http://localhost:5000/add-food", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(food)
+
+      });
+
+      alert("Food donated successfully!");
+      window.location.href = "index.html";
+
+    });
+
+    async function loadDonatedFoods() {
+      try {
+        const response = await fetch("http://localhost:5000/donated-foods");
+        if (!response.ok) return;
+        const foods = await response.json();
+        const container = document.getElementById("donatedList");
+        container.innerHTML = "";
+        
+        if (foods.length === 0) {
+          container.innerHTML = "<p>No donations fully claimed yet. Be the first!</p>";
+        }
+
+        foods.forEach(food => {
+          const item = document.createElement("div");
+          item.style.padding = "15px";
+          item.style.border = "1px solid #e0e0e0";
+          item.style.borderRadius = "8px";
+          item.style.background = "#f9fff9";
+          
+          item.innerHTML = `
+            <h3 style="margin-top: 0; color: #28a745; margin-bottom: 5px;">✅ ${food.foodName} (Donated completely)</h3>
+            <p style="margin: 5px 0; color: #444;"><b>Hero Donor:</b> ${food.donorName}</p>
+            <p style="margin: 5px 0; color: #666; font-size: 14px;">📍 ${food.area}, ${food.location}</p>
+          `;
+          container.appendChild(item);
+        });
+      } catch (err) {
+        console.log("Error loading donated foods", err);
+      }
+    }
+    
+    loadDonatedFoods();
+
+  </script>
+
+</body>
+
+</html>

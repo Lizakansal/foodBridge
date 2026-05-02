@@ -22,6 +22,18 @@
         </p>
       </div>
 
+      <div class="card" style="background: linear-gradient(135deg, #27ae60 0%, #2ecc71 100%); color: white; margin-bottom: 20px; border: none; text-align: left; padding: 20px;">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <div>
+            <h3 style="margin: 0; font-size: 18px;">🥗 Is your food fresh?</h3>
+            <p style="margin: 5px 0 0 0; font-size: 13px; opacity: 0.9;">Verify quality with our AI tool before donating.</p>
+          </div>
+          <a href="freshness.html" onclick="saveFormState()" style="text-decoration: none;">
+            <button style="width: auto; background: white; color: #27ae60; padding: 8px 15px; margin: 0; font-size: 14px; font-weight: bold; box-shadow: 0 4px 10px rgba(0,0,0,0.1);">Check Now →</button>
+          </a>
+        </div>
+      </div>
+
       <div class="card">
 
         <form id="foodForm">
@@ -85,11 +97,15 @@
   <script>
 
     document.getElementById("foodForm").addEventListener("submit", async function (e) {
-
       e.preventDefault();
 
-      const type = document.querySelector('input[name="type"]:checked').value;
+      const isFreshnessApproved = sessionStorage.getItem("foodFreshnessApproved");
+      if (isFreshnessApproved !== "true") {
+        alert("Please verify your food's freshness using our AI tool before donating. Click the 'Check Now →' button above.");
+        return;
+      }
 
+      const type = document.querySelector('input[name="type"]:checked').value;
 
       const area = document.getElementById("area").value;
       const location = document.getElementById("location").value;
@@ -139,13 +155,49 @@
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(food)
-
       });
 
+      sessionStorage.removeItem("foodFreshnessApproved");
+      sessionStorage.removeItem("donationFormState");
       alert("Food donated successfully!");
       window.location.href = "index.html";
 
     });
+
+    function saveFormState() {
+      const state = {
+        donorName: document.getElementById("donorName").value,
+        foodName: document.getElementById("foodName").value,
+        quantity: document.getElementById("quantity").value,
+        quantityUnit: document.getElementById("quantityUnit").value,
+        expiryTime: document.getElementById("expiryTime").value,
+        area: document.getElementById("area").value,
+        location: document.getElementById("location").value,
+        contact: document.getElementById("contact").value,
+        mail: document.getElementById("mail").value,
+        type: document.querySelector('input[name="type"]:checked').value
+      };
+      sessionStorage.setItem("donationFormState", JSON.stringify(state));
+    }
+
+    function loadFormState() {
+      const saved = sessionStorage.getItem("donationFormState");
+      if (saved) {
+        const state = JSON.parse(saved);
+        document.getElementById("donorName").value = state.donorName || "";
+        document.getElementById("foodName").value = state.foodName || "";
+        document.getElementById("quantity").value = state.quantity || "";
+        document.getElementById("quantityUnit").value = state.quantityUnit || "Servings";
+        document.getElementById("expiryTime").value = state.expiryTime || "";
+        document.getElementById("area").value = state.area || "";
+        document.getElementById("location").value = state.location || "";
+        document.getElementById("contact").value = state.contact || "";
+        document.getElementById("mail").value = state.mail || "";
+
+        const radio = document.querySelector(`input[name="type"][value="${state.type}"]`);
+        if (radio) radio.checked = true;
+      }
+    }
 
     async function loadDonatedFoods() {
       try {
@@ -178,7 +230,10 @@
       }
     }
     
-    loadDonatedFoods();
+    window.onload = () => {
+      loadFormState();
+      loadDonatedFoods();
+    };
 
   </script>
 

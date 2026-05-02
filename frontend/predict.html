@@ -1,0 +1,825 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Smart Demand Prediction - FoodBridge</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', Arial, sans-serif;
+            margin: 0;
+        }
+
+        .overlay {
+            min-height: 100vh;
+            padding: 30px 20px;
+        }
+
+        .container {
+            max-width: 1100px;
+            width: 100%;
+        }
+
+        .hero h1 {
+            font-size: 36px;
+            font-weight: 800;
+            background: linear-gradient(135deg, #a855f7, #ec4899);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 4px;
+        }
+
+        .hero .tagline {
+            color: #d1d5db;
+            font-size: 15px;
+            margin-bottom: 0;
+        }
+
+        /* ===== MAIN LAYOUT ===== */
+        .main-grid {
+            display: grid;
+            grid-template-columns: 340px 1fr;
+            gap: 24px;
+            margin-top: 20px;
+            width: 100%;
+        }
+
+        @media (max-width: 850px) {
+            .main-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* ===== GLASS CARD ===== */
+        .glass-card {
+            background: rgba(255, 255, 255, 0.06);
+            backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 16px;
+            padding: 24px;
+            color: #f3f4f6;
+        }
+
+        .glass-card h2 {
+            font-size: 18px;
+            font-weight: 700;
+            margin: 0 0 18px 0;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        /* ===== NGO LIST ===== */
+        .ngo-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            max-height: 520px;
+            overflow-y: auto;
+            padding-right: 4px;
+        }
+
+        .ngo-list::-webkit-scrollbar {
+            width: 5px;
+        }
+
+        .ngo-list::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        .ngo-list::-webkit-scrollbar-thumb {
+            background: rgba(168, 85, 247, 0.4);
+            border-radius: 10px;
+        }
+
+        .ngo-item {
+            padding: 14px 16px;
+            border-radius: 12px;
+            cursor: pointer;
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            transition: all 0.25s ease;
+        }
+
+        .ngo-item:hover {
+            background: rgba(168, 85, 247, 0.12);
+            border-color: rgba(168, 85, 247, 0.3);
+            transform: translateX(4px);
+        }
+
+        .ngo-item.active {
+            background: linear-gradient(135deg, rgba(168, 85, 247, 0.2), rgba(236, 72, 153, 0.15));
+            border-color: rgba(168, 85, 247, 0.5);
+            box-shadow: 0 0 20px rgba(168, 85, 247, 0.15);
+        }
+
+        .ngo-item .ngo-name {
+            font-weight: 600;
+            font-size: 14px;
+            margin-bottom: 6px;
+            color: #f9fafb;
+        }
+
+        .ngo-item .ngo-stats {
+            display: flex;
+            gap: 12px;
+            font-size: 11px;
+            color: #9ca3af;
+        }
+
+        .ngo-item .ngo-stats span {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        /* ===== RIGHT PANEL ===== */
+        .right-panel {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        /* ===== PREDICTION FORM ===== */
+        .predict-section {
+            display: flex;
+            gap: 16px;
+            align-items: flex-end;
+            flex-wrap: wrap;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .form-group label {
+            font-size: 12px;
+            font-weight: 600;
+            color: #9ca3af;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .form-group input[type="date"] {
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 10px;
+            padding: 12px 16px;
+            color: #f3f4f6;
+            font-size: 14px;
+            font-family: 'Inter', sans-serif;
+            outline: none;
+            transition: border-color 0.2s;
+            width: 220px;
+        }
+
+        .form-group input[type="date"]:focus {
+            border-color: #a855f7;
+            box-shadow: 0 0 0 3px rgba(168, 85, 247, 0.15);
+        }
+
+        .form-group input[type="date"]::-webkit-calendar-picker-indicator {
+            filter: invert(1);
+            cursor: pointer;
+        }
+
+        .predict-btn {
+            background: linear-gradient(135deg, #a855f7, #7c3aed);
+            border: none;
+            border-radius: 12px;
+            padding: 12px 28px;
+            color: white;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            width: auto;
+            margin: 0;
+        }
+
+        .predict-btn:hover {
+            transform: translateY(-2px) scale(1.02);
+            box-shadow: 0 8px 25px rgba(168, 85, 247, 0.4);
+        }
+
+        .predict-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .selected-ngo-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            background: linear-gradient(135deg, rgba(168, 85, 247, 0.2), rgba(236, 72, 153, 0.15));
+            border: 1px solid rgba(168, 85, 247, 0.3);
+            border-radius: 20px;
+            padding: 6px 14px;
+            font-size: 13px;
+            color: #d8b4fe;
+            font-weight: 500;
+        }
+
+        /* ===== RESULT CARD ===== */
+        .result-card {
+            display: none;
+            animation: slideUp 0.5s ease;
+        }
+
+        .result-card.show {
+            display: block;
+        }
+
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .result-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+
+        .big-number {
+            font-size: 56px;
+            font-weight: 800;
+            background: linear-gradient(135deg, #a855f7, #ec4899);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            line-height: 1;
+        }
+
+        .big-number-label {
+            font-size: 14px;
+            color: #9ca3af;
+            font-weight: 500;
+        }
+
+        .confidence-meter {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            gap: 6px;
+        }
+
+        .confidence-bar-bg {
+            width: 140px;
+            height: 8px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            overflow: hidden;
+        }
+
+        .confidence-bar-fill {
+            height: 100%;
+            border-radius: 10px;
+            transition: width 0.8s ease;
+        }
+
+        .confidence-text {
+            font-size: 12px;
+            color: #9ca3af;
+        }
+
+        /* ===== BREAKDOWN GRID ===== */
+        .breakdown-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+            gap: 12px;
+            margin-top: 16px;
+        }
+
+        .breakdown-item {
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            border-radius: 12px;
+            padding: 14px;
+            text-align: center;
+        }
+
+        .breakdown-item .label {
+            font-size: 11px;
+            color: #6b7280;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 6px;
+        }
+
+        .breakdown-item .value {
+            font-size: 20px;
+            font-weight: 700;
+            color: #e5e7eb;
+        }
+
+        /* ===== ORDER HISTORY TABLE ===== */
+        .history-card {
+            display: none;
+        }
+
+        .history-card.show {
+            display: block;
+        }
+
+        .history-table-wrap {
+            max-height: 320px;
+            overflow-y: auto;
+            border-radius: 10px;
+        }
+
+        .history-table-wrap::-webkit-scrollbar {
+            width: 5px;
+        }
+
+        .history-table-wrap::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        .history-table-wrap::-webkit-scrollbar-thumb {
+            background: rgba(168, 85, 247, 0.4);
+            border-radius: 10px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+        }
+
+        thead th {
+            background: rgba(168, 85, 247, 0.15);
+            padding: 10px 14px;
+            text-align: left;
+            font-weight: 600;
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: #d8b4fe;
+            position: sticky;
+            top: 0;
+        }
+
+        tbody tr {
+            border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+            transition: background 0.15s;
+        }
+
+        tbody tr:hover {
+            background: rgba(168, 85, 247, 0.06);
+        }
+
+        tbody td {
+            padding: 10px 14px;
+            color: #d1d5db;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 2px 10px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+
+        .badge-regular {
+            background: rgba(59, 130, 246, 0.15);
+            color: #93c5fd;
+        }
+
+        .badge-weekend {
+            background: rgba(168, 85, 247, 0.15);
+            color: #d8b4fe;
+        }
+
+        .badge-holiday {
+            background: rgba(245, 158, 11, 0.15);
+            color: #fcd34d;
+        }
+
+        /* ===== LOADING ===== */
+        .loading-dots {
+            display: none;
+            gap: 6px;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .loading-dots.show {
+            display: flex;
+        }
+
+        .loading-dots span {
+            width: 10px;
+            height: 10px;
+            background: #a855f7;
+            border-radius: 50%;
+            animation: bounce 1.4s infinite both;
+        }
+
+        .loading-dots span:nth-child(2) {
+            animation-delay: 0.16s;
+        }
+
+        .loading-dots span:nth-child(3) {
+            animation-delay: 0.32s;
+        }
+
+        @keyframes bounce {
+
+            0%,
+            80%,
+            100% {
+                transform: scale(0);
+                opacity: 0.5;
+            }
+
+            40% {
+                transform: scale(1);
+                opacity: 1;
+            }
+        }
+
+        /* ===== EMPTY STATE ===== */
+        .empty-state {
+            text-align: center;
+            padding: 50px 20px;
+            color: #6b7280;
+        }
+
+        .empty-state .icon {
+            font-size: 48px;
+            margin-bottom: 12px;
+        }
+
+        .empty-state p {
+            font-size: 14px;
+            line-height: 1.6;
+        }
+
+        /* ===== BACK LINK ===== */
+        .back-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            color: #9ca3af;
+            text-decoration: none;
+            font-size: 13px;
+            margin-top: 20px;
+            transition: color 0.2s;
+        }
+
+        .back-link:hover {
+            color: #d8b4fe;
+        }
+
+        /* ===== SEARCH ===== */
+        .search-box {
+            width: 100%;
+            padding: 10px 14px;
+            background: rgba(255, 255, 255, 0.06);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            color: #f3f4f6;
+            font-size: 13px;
+            font-family: 'Inter', sans-serif;
+            outline: none;
+            margin-bottom: 14px;
+            transition: border-color 0.2s;
+        }
+
+        .search-box::placeholder {
+            color: #6b7280;
+        }
+
+        .search-box:focus {
+            border-color: #a855f7;
+            box-shadow: 0 0 0 3px rgba(168, 85, 247, 0.1);
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="overlay">
+        <div class="container">
+            <div class="hero">
+                <h1>🧠 Smart Demand Prediction</h1>
+                <p class="tagline">AI-powered predictions based on real NGO order history</p>
+            </div>
+
+            <div class="main-grid">
+                <!-- LEFT: NGO List -->
+                <div class="glass-card">
+                    <h2>📋 Select NGO</h2>
+                    <input type="text" class="search-box" id="ngoSearch" placeholder="🔍 Search NGOs..."
+                        oninput="filterNgos()">
+                    <div class="ngo-list" id="ngoList">
+                        <div class="loading-dots show" id="ngoLoader">
+                            <span></span><span></span><span></span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- RIGHT: Prediction + History -->
+                <div class="right-panel">
+
+                    <!-- Prediction Form -->
+                    <div class="glass-card">
+                        <h2>🎯 Predict Demand</h2>
+
+                        <div id="noNgoSelected">
+                            <div class="empty-state">
+                                <div class="icon">👈</div>
+                                <p>Select an NGO from the list to start predicting.<br>The AI will analyze their past
+                                    orders and forecast future demand.</p>
+                            </div>
+                        </div>
+
+                        <div id="predictionForm" style="display:none;">
+                            <div class="predict-section">
+                                <div
+                                    style="display:flex; align-items:center; gap:10px; margin-bottom:12px; width:100%;">
+                                    <span class="selected-ngo-badge" id="selectedNgoBadge">—</span>
+                                </div>
+                            </div>
+                            <div class="predict-section">
+                                <div class="form-group">
+                                    <label>Prediction Date</label>
+                                    <input type="date" id="targetDate">
+                                </div>
+                                <button class="predict-btn" id="predictBtn" onclick="runPrediction()">
+                                    Predict 🚀
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Loading -->
+                        <div class="loading-dots" id="predictLoader">
+                            <span></span><span></span><span></span>
+                        </div>
+
+                        <!-- Result -->
+                        <div class="result-card" id="resultCard">
+                            <div class="result-header">
+                                <div>
+                                    <div class="big-number" id="bigNumber">—</div>
+                                    <div class="big-number-label">Predicted Plates</div>
+                                </div>
+                                <div class="confidence-meter">
+                                    <div class="confidence-text">Confidence: <strong id="confValue">—</strong></div>
+                                    <div class="confidence-bar-bg">
+                                        <div class="confidence-bar-fill" id="confBar" style="width:0%"></div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="breakdown-grid" id="breakdownGrid"></div>
+                        </div>
+                    </div>
+
+                    <!-- Order History -->
+                    <div class="glass-card history-card" id="historyCard">
+                        <h2>📊 Order History <span id="historyCount"
+                                style="font-weight:400; font-size:13px; color:#6b7280;"></span></h2>
+                        <div class="history-table-wrap">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Date</th>
+                                        <th>Plates</th>
+                                        <th>Day</th>
+                                        <th>Type</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="historyBody"></tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+
+            <a href="index.html" class="back-link">← Back to Home</a>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = "http://localhost:5000";
+        let allNgos = [];
+        let selectedNgo = null;
+
+        const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+        // ===== Load NGOs =====
+        async function loadNgos() {
+            try {
+                const res = await fetch(`${API_BASE}/api/ngos`);
+                allNgos = await res.json();
+                renderNgoList(allNgos);
+            } catch (err) {
+                console.error("Failed to load NGOs:", err);
+                document.getElementById("ngoList").innerHTML = `<div class="empty-state"><p>❌ Failed to load NGO data. Make sure the server is running.</p></div>`;
+            }
+        }
+
+        function renderNgoList(ngos) {
+            const loader = document.getElementById("ngoLoader");
+            if (loader) loader.remove();
+
+            const list = document.getElementById("ngoList");
+            if (ngos.length === 0) {
+                list.innerHTML = `<div class="empty-state"><p>No NGOs found. Run the seed script first.</p></div>`;
+                return;
+            }
+
+            list.innerHTML = ngos.map(ngo => `
+      <div class="ngo-item ${selectedNgo === ngo.name ? 'active' : ''}" onclick="selectNgo('${ngo.name}')" data-name="${ngo.name.toLowerCase()}">
+        <div class="ngo-name">${ngo.name}</div>
+        <div class="ngo-stats">
+          <span>📦 ${ngo.totalOrders} orders</span>
+          <span>🍽️ avg ${ngo.avgPlates} plates</span>
+          <span>📅 ${ngo.lastOrder ? new Date(ngo.lastOrder).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }) : '—'}</span>
+        </div>
+      </div>
+    `).join("");
+        }
+
+        function filterNgos() {
+            const query = document.getElementById("ngoSearch").value.toLowerCase();
+            const filtered = allNgos.filter(n => n.name.toLowerCase().includes(query));
+            renderNgoList(filtered);
+        }
+
+        // ===== Select NGO =====
+        async function selectNgo(name) {
+            selectedNgo = name;
+
+            // Update UI
+            document.getElementById("noNgoSelected").style.display = "none";
+            document.getElementById("predictionForm").style.display = "block";
+            document.getElementById("selectedNgoBadge").textContent = "🏢 " + name;
+            document.getElementById("resultCard").classList.remove("show");
+
+            // Set default date to tomorrow
+            const tomorrow = new Date();
+            tomorrow.setDate(tomorrow.getDate() + 1);
+            document.getElementById("targetDate").value = tomorrow.toISOString().split("T")[0];
+
+            // Refresh NGO list to highlight active
+            renderNgoList(allNgos.filter(n => n.name.toLowerCase().includes(document.getElementById("ngoSearch").value.toLowerCase())));
+
+            // Load order history
+            await loadOrderHistory(name);
+        }
+
+        // ===== Load Order History =====
+        async function loadOrderHistory(ngoName) {
+            const card = document.getElementById("historyCard");
+            const body = document.getElementById("historyBody");
+
+            try {
+                const res = await fetch(`${API_BASE}/api/ngo-orders/${encodeURIComponent(ngoName)}`);
+                const orders = await res.json();
+
+                document.getElementById("historyCount").textContent = `(${orders.length} records)`;
+
+                if (orders.length === 0) {
+                    body.innerHTML = `<tr><td colspan="4" style="text-align:center; color:#6b7280; padding:20px;">No orders found</td></tr>`;
+                } else {
+                    body.innerHTML = orders.map(o => {
+                        const d = new Date(o.orderDate);
+                        const dayName = dayNames[d.getDay()];
+                        const dateStr = d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+                        const badgeClass = o.eventType === 'holiday' ? 'badge-holiday' : o.eventType === 'weekend' ? 'badge-weekend' : 'badge-regular';
+                        return `
+            <tr>
+              <td>${dateStr}</td>
+              <td><strong>${o.platesOrdered}</strong></td>
+              <td>${dayName}</td>
+              <td><span class="badge ${badgeClass}">${o.eventType}</span></td>
+            </tr>
+          `;
+                    }).join("");
+                }
+
+                card.classList.add("show");
+            } catch (err) {
+                console.error("Failed to load history:", err);
+            }
+        }
+
+        // ===== Run Prediction =====
+        async function runPrediction() {
+            if (!selectedNgo) {
+                alert("Please select an NGO first!");
+                return;
+            }
+
+            const targetDate = document.getElementById("targetDate").value;
+            if (!targetDate) {
+                alert("Please select a date to predict for.");
+                return;
+            }
+
+            const btn = document.getElementById("predictBtn");
+            const loader = document.getElementById("predictLoader");
+            const resultCard = document.getElementById("resultCard");
+
+            btn.disabled = true;
+            btn.textContent = "Analyzing...";
+            loader.classList.add("show");
+            resultCard.classList.remove("show");
+
+            try {
+                const res = await fetch(`${API_BASE}/api/smart-predict`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ ngoName: selectedNgo, targetDate })
+                });
+
+                const data = await res.json();
+
+                if (data.error) {
+                    alert("Prediction failed: " + data.error);
+                    return;
+                }
+
+                // Show result
+                document.getElementById("bigNumber").textContent = data.predictedPlates;
+                document.getElementById("confValue").textContent = data.confidence + "%";
+
+                // Confidence bar
+                const confBar = document.getElementById("confBar");
+                const confColor = data.confidence > 70 ? "#22c55e" : data.confidence > 45 ? "#f59e0b" : "#ef4444";
+                confBar.style.width = data.confidence + "%";
+                confBar.style.background = confColor;
+
+                // Breakdown
+                const bd = data.breakdown;
+                const grid = document.getElementById("breakdownGrid");
+                grid.innerHTML = `
+        <div class="breakdown-item">
+          <div class="label">Overall Avg</div>
+          <div class="value">${bd.overallAvg}</div>
+        </div>
+        <div class="breakdown-item">
+          <div class="label">Weighted Avg</div>
+          <div class="value">${bd.weightedAvg}</div>
+        </div>
+        <div class="breakdown-item">
+          <div class="label">Day-of-Week Avg</div>
+          <div class="value">${bd.dayOfWeekAvg}</div>
+        </div>
+        <div class="breakdown-item">
+          <div class="label">Day Factor</div>
+          <div class="value">${bd.dayFactor}x</div>
+        </div>
+        <div class="breakdown-item">
+          <div class="label">Growth Trend</div>
+          <div class="value" style="color: ${parseFloat(bd.growthRate) >= 0 ? '#22c55e' : '#ef4444'}">${bd.growthRate}</div>
+        </div>
+        <div class="breakdown-item">
+          <div class="label">Orders Analyzed</div>
+          <div class="value">${bd.totalOrdersAnalyzed}</div>
+        </div>
+      `;
+
+                resultCard.classList.add("show");
+            } catch (err) {
+                alert("Failed to connect to server.");
+                console.error(err);
+            } finally {
+                btn.disabled = false;
+                btn.textContent = "Predict 🚀";
+                loader.classList.remove("show");
+            }
+        }
+
+        // ===== Init =====
+        loadNgos();
+    </script>
+
+</body>
+
+</html>

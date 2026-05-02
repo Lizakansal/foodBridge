@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NGO Dashboard - AI Route Optimization</title>
+
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
+
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f4f7f6;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+
+        header {
+            background-color: #2c3e50;
+            color: white;
+            padding: 15px 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logout-btn {
+            background-color: #e74c3c;
+            color: white;
+            border: none;
+            padding: 8px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        .main-container {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        .sidebar {
+            width: 350px;
+            background: white;
+            padding: 20px;
+            overflow-y: auto;
+            box-shadow: 2px 0 5px rgba(0, 0, 0, 0.1);
+            z-index: 10;
+        }
+
+        .map-container {
+            flex: 1;
+            position: relative;
+        }
+
+        #map {
+            width: 100%;
+            height: 100%;
+        }
+
+        .request-card {
+            background: #fff;
+            border: 1px solid #ddd;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+        }
+
+        .request-card h3 {
+            margin: 0 0 10px 0;
+            color: #27ae60;
+        }
+
+        .request-card p {
+            margin: 5px 0;
+            color: #555;
+            font-size: 14px;
+        }
+
+        .optimize-btn {
+            background-color: #3498db;
+            color: white;
+            border: none;
+            padding: 12px;
+            width: 100%;
+            border-radius: 5px;
+            font-size: 16px;
+            cursor: pointer;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .optimize-btn:hover {
+            background-color: #2980b9;
+        }
+
+        .optimize-btn:disabled {
+            background-color: #bdc3c7;
+            cursor: not-allowed;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: #7f8c8d;
+        }
+
+        /* Routing Details Styling */
+        #routingDetails {
+            margin-top: 20px;
+            border-top: 2px solid #ecf0f1;
+            padding-top: 10px;
+        }
+
+        #routingDetails .leaflet-routing-container {
+            width: 100% !important;
+            max-width: 100% !important;
+            padding: 0 !important;
+            margin: 0 !important;
+            background: transparent !important;
+            box-shadow: none !important;
+            color: #333;
+        }
+
+        #routingDetails .leaflet-routing-alt {
+            max-height: none !important;
+        }
+    </style>
+</head>
+
+<body>
+
+    <header>
+        <h2>FoodBridge NGO Portal</h2>
+        <div>
+            <span id="ngoEmailDisplay" style="margin-right: 15px; font-weight: bold;"></span>
+            <button class="logout-btn" onclick="logout()">Logout</button>
+        </div>
+    </header>
+
+    <div class="main-container">
+        <div class="sidebar">
+            <button id="optimizeBtn" class="optimize-btn" onclick="generateOptimizedRoute()" disabled>
+                ✨ Generate AI Optimized Route
+            </button>
+
+            <h3>Accepted Pickups (<span id="pickupCount">0</span>)</h3>
+            <div id="requestsList">
+                <div class="loading">Loading requests...</div>
+            </div>
+
+            <div id="routingDetails"></div>
+        </div>
+
+        <div class="map-container">
+            <div id="map"></div>
+        </div>
+    </div>
+
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js"></script>
+
+    <script>
+        const API_URL = "http://localhost:5000";
+        let map;
+        let routingControl = null;
+        let pickupLocations = [];
+        let myCurrentLocation = null;
+        let markers = [];
+
+        // Check login
+        const ngoEmail = localStorage.getItem("ngoEmail");
+        if (!ngoEmail) {
+            window.location.href = "ngo-login.html";
+        } else {
+            document.getElementById("ngoEmailDisplay").innerText = ngoEmail;
+            initMap();
+            fetchAcceptedRequests();
+        }
+
+        function logout() {
+            localStorage.removeItem("ngoEmail");
+            window.location.href = "ngo-login.html";
+        }
+
+        function initMap() {
+            // Default center (India)
+            map = L.map('map').setView([20.5937, 78.9629], 5);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '&copy; OpenStreetMap contributors'
+            }).addTo(map);
+
+            // Try to get user's location immediately
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(
+                    (position) => {
+                        myCurrentLocation = L.latLng(position.coords.latitude, position.coords.longitude);
+                        map.setView(myCurrentLocation, 12);
+
+                        // Add a marker for NGO
+                        L.marker(myCurrentLocation, {
+                            icon: L.icon({
+                                iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-blue.png',
+                                shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
+                                iconSize: [25, 41],
+                                iconAnchor: [12, 41],
+                                popupAnchor: [1, -34],
+                                shadowSize: [41, 41]
+                            })
+                        }).addTo(map).bindPopup("<b>Your Location</b>").openPopup();
+                    },
+                    (err) => console.log("Geolocation error:", err),
+                    { enableHighAccuracy: true }
+                );
+            }
+        }
+
+        async function fetchAcceptedRequests() {
+            try {
+                const response = await fetch(`${API_URL}/ngo-accepted-requests/${ngoEmail}`);
+                pickupLocations = await response.json();
+
+                document.getElementById("pickupCount").innerText = pickupLocations.length;
+                const listDiv = document.getElementById("requestsList");
+                listDiv.innerHTML = "";
+
+                if (pickupLocations.length === 0) {
+                    listDiv.innerHTML = "<p style='color: #7f8c8d;'>No accepted requests found.</p>";
+                    return;
+                }
+
+                // Enable optimize button
+                document.getElementById("optimizeBtn").disabled = false;
+
+                const bounds = L.latLngBounds();
+
+                pickupLocations.forEach((req, index) => {
+                    // Add to list
+                    const card = document.createElement("div");
+                    card.className = "request-card";
+                    card.innerHTML = `
+                    <h3>${req.foodName}</h3>
+                    <p><b>Quantity:</b> ${req.quantity}</p>
+                    <p><b>Donor:</b> ${req.donorName}</p>
+                    <p><b>Contact:</b> ${req.contact}</p>
+                    <p><b>Location:</b> ${req.location}, ${req.area}</p>
+                `;
+                    listDiv.appendChild(card);
+
+                    // Add to map
+                    if (req.lat && req.lng) {
+                        const latLng = L.latLng(parseFloat(req.lat), parseFloat(req.lng));
+                        const marker = L.marker(latLng, {
+                            icon: L.icon({
+                                iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-green.png',
+                                shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
+                                iconSize: [25, 41],
+                                iconAnchor: [12, 41],
+                                popupAnchor: [1, -34],
+                                shadowSize: [41, 41]
+                            })
+                        }).addTo(map);
+
+                        marker.bindPopup(`<b>${req.foodName}</b><br>Pickup from: ${req.donorName}`);
+                        markers.push(marker);
+                        bounds.extend(latLng);
+                    }
+                });
+
+                if (myCurrentLocation) bounds.extend(myCurrentLocation);
+                if (bounds.isValid()) map.fitBounds(bounds, { padding: [50, 50] });
+
+            } catch (error) {
+                console.error("Error fetching requests:", error);
+                document.getElementById("requestsList").innerHTML = "<p class='error'>Failed to load requests.</p>";
+            }
+        }
+
+        // AI / TSP nearest neighbor sorting
+        function optimizeWaypoints(startLatLng, destinations) {
+            let unvisited = [...destinations];
+            let current = startLatLng;
+            let optimized = [current];
+
+            while (unvisited.length > 0) {
+                let nearestIdx = 0;
+                let minDistance = Infinity;
+
+                for (let i = 0; i < unvisited.length; i++) {
+                    const dist = current.distanceTo(unvisited[i]);
+                    if (dist < minDistance) {
+                        minDistance = dist;
+                        nearestIdx = i;
+                    }
+                }
+
+                current = unvisited[nearestIdx];
+                optimized.push(current);
+                unvisited.splice(nearestIdx, 1);
+            }
+
+            return optimized;
+        }
+
+        function generateOptimizedRoute() {
+            if (pickupLocations.length === 0) return;
+
+            if (!myCurrentLocation) {
+                alert("Waiting for your GPS location. Please ensure location permissions are granted.");
+                return;
+            }
+
+            const btn = document.getElementById("optimizeBtn");
+            btn.innerText = "Calculating AI Route...";
+            btn.disabled = true;
+
+            // Clear existing route
+            if (routingControl) {
+                map.removeControl(routingControl);
+            }
+
+            // Get all valid lat/lngs from pickup locations
+            const destinations = pickupLocations
+                .filter(req => req.lat && req.lng)
+                .map(req => L.latLng(parseFloat(req.lat), parseFloat(req.lng)));
+
+            if (destinations.length === 0) {
+                alert("No valid coordinates found for the pickup locations.");
+                btn.innerText = "✨ Generate AI Optimized Route";
+                btn.disabled = false;
+                return;
+            }
+
+            // Sort using Nearest Neighbor for "AI Optimized Path"
+            const waypoints = optimizeWaypoints(myCurrentLocation, destinations);
+
+            // Remove individual markers since routing machine will add its own
+            markers.forEach(m => map.removeLayer(m));
+            markers = [];
+
+            routingControl = L.Routing.control({
+                waypoints: waypoints,
+                routeWhileDragging: false,
+                addWaypoints: false,
+                fitSelectedRoutes: true,
+                show: true,
+                itineraryContainer: document.getElementById('routingDetails'),
+                lineOptions: {
+                    styles: [{ color: '#e74c3c', opacity: 0.8, weight: 6 }]
+                },
+                createMarker: function (i, wp, nWps) {
+                    if (i === 0) {
+                        return L.marker(wp.latLng, {
+                            icon: L.icon({
+                                iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-blue.png',
+                                iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34]
+                            })
+                        }).bindPopup("<b>Start (You)</b>");
+                    } else {
+                        return L.marker(wp.latLng, {
+                            icon: L.icon({
+                                iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-green.png',
+                                iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34]
+                            })
+                        }).bindPopup(`<b>Stop ${i}</b>`);
+                    }
+                }
+            }).addTo(map);
+
+            routingControl.on('routesfound', function (e) {
+                btn.innerText = "Route Optimized!";
+                // Reset after 3 seconds
+                setTimeout(() => {
+                    btn.innerText = "✨ Regenerate Route";
+                    btn.disabled = false;
+                }, 3000);
+            });
+
+            routingControl.on('routingerror', function (e) {
+                alert("Error generating route. Try again.");
+                btn.innerText = "✨ Generate AI Optimized Route";
+                btn.disabled = false;
+            });
+        }
+    </script>
+
+</body>
+
+</html>

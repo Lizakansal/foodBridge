@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Food Freshness Detector | FoodBridge</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        .overlay {
+            justify-content: flex-start !important;
+            padding: 20px 0;
+            overflow-y: auto;
+        }
+
+        .freshness-container {
+            max-width: 600px;
+            width: 95%;
+            background: white;
+            border-radius: 20px;
+            padding: 25px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            text-align: center;
+            color: #333;
+            margin: 10px auto;
+        }
+
+        .camera-box {
+            width: 100%;
+            height: 350px;
+            background: #000;
+            border-radius: 15px;
+            overflow: hidden;
+            position: relative;
+            margin-bottom: 20px;
+            border: 4px solid #ff6b35;
+        }
+
+        #video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        #canvas {
+            display: none;
+        }
+
+        .capture-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            border: 2px dashed rgba(255,255,255,0.5);
+            pointer-events: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .capture-overlay::after {
+            content: 'Align food here';
+            color: white;
+            background: rgba(0,0,0,0.5);
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 12px;
+        }
+
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .btn-check {
+            background: #27ae60;
+            flex: 2;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+
+        .btn-check:disabled {
+            background: #95a5a6;
+            cursor: not-allowed;
+        }
+
+        .btn-upload {
+            background: #2d9cdb;
+            flex: 1;
+        }
+
+        #resultArea {
+            display: none;
+            margin-top: 20px;
+            padding: 20px;
+            border-radius: 12px;
+            text-align: left;
+            animation: slideUp 0.5s ease-out;
+        }
+
+        @keyframes slideUp {
+            from { transform: translateY(20px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-weight: bold;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+            font-size: 14px;
+        }
+
+        .status-fresh { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .status-stale { background: #fff3cd; color: #856404; border: 1px solid #ffeeba; }
+        .status-spoiled { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+
+        .loading-spinner {
+            display: none;
+            margin: 20px 0;
+        }
+
+        .fa-spin { margin-right: 10px; }
+
+        .hidden { display: none; }
+        
+        #previewImg {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: none;
+        }
+
+        .back-link {
+            display: block;
+            margin-top: 20px;
+            color: #ff6b35;
+            text-decoration: none;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="overlay">
+        <div class="hero">
+            <h1>FoodBridge AI</h1>
+            <p class="tagline">Smart Freshness Analysis</p>
+        </div>
+
+        <div class="freshness-container">
+            <h2 style="margin-bottom: 10px;">Check Food Freshness</h2>
+            <p style="color: #666; margin-bottom: 20px; font-size: 14px;">Use your camera or upload a photo to verify food quality before donating.</p>
+
+            <div class="camera-box">
+                <video id="video" autoplay playsinline></video>
+                <img id="previewImg" alt="Preview">
+                <div class="capture-overlay" id="overlay"></div>
+            </div>
+
+            <div class="controls">
+                <button class="btn-upload" onclick="document.getElementById('fileInput').click()">
+                    <i class="fas fa-upload"></i> Upload
+                </button>
+                <button id="analyzeBtn" class="btn-check" onclick="analyzeFood()">
+                    <i class="fas fa-robot"></i> Analyze Freshness
+                </button>
+            </div>
+
+            <input type="file" id="fileInput" class="hidden" accept="image/*" onchange="handleFileUpload(event)">
+            <canvas id="canvas"></canvas>
+
+            <div id="loading" class="loading-spinner">
+                <i class="fas fa-circle-notch fa-spin"></i> Analyzing with AI...
+            </div>
+
+            <div id="resultArea">
+                <!-- Results will be injected here -->
+            </div>
+
+            <a href="donate.html" class="back-link">← Back to Donation</a>
+        </div>
+    </div>
+
+    <script>
+        const video = document.getElementById('video');
+        const canvas = document.getElementById('canvas');
+        const previewImg = document.getElementById('previewImg');
+        const overlay = document.getElementById('overlay');
+        const resultArea = document.getElementById('resultArea');
+        const loading = document.getElementById('loading');
+        const analyzeBtn = document.getElementById('analyzeBtn');
+
+        let stream = null;
+
+        // Start Camera
+        async function startCamera() {
+            try {
+                stream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { facingMode: "environment" } 
+                });
+                video.srcObject = stream;
+                video.style.display = 'block';
+                previewImg.style.display = 'none';
+            } catch (err) {
+                console.error("Camera Error:", err);
+                overlay.innerHTML = "<i class='fas fa-exclamation-circle'></i> Camera access denied. Use 'Upload' instead.";
+                video.style.display = 'none';
+                previewImg.style.display = 'none';
+            }
+        }
+
+        startCamera();
+
+        function handleFileUpload(event) {
+            const file = event.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    previewImg.src = e.target.result;
+                    previewImg.style.display = 'block';
+                    video.style.display = 'none';
+                    overlay.style.display = 'none';
+                };
+                reader.readAsDataURL(file);
+            }
+        }
+
+        async function analyzeFood() {
+            loading.style.display = 'block';
+            resultArea.style.display = 'none';
+            analyzeBtn.disabled = true;
+
+            let blob;
+
+            // Capture from video if it's currently showing
+            if (video.style.display === 'block' && video.srcObject) {
+                const context = canvas.getContext('2d');
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+                context.drawImage(video, 0, 0);
+                blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg'));
+            } 
+            // Else use the uploaded file
+            else {
+                const fileInput = document.getElementById('fileInput');
+                blob = fileInput.files[0];
+            }
+
+            if (!blob) {
+                alert("No image found. Please take a photo or upload one first.");
+                loading.style.display = 'none';
+                analyzeBtn.disabled = false;
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('foodImage', blob);
+
+            try {
+                const response = await fetch('http://localhost:5000/check-freshness', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!response.ok) {
+                    const errData = await response.json();
+                    throw new Error(errData.details || errData.error || "Server Error");
+                }
+
+                const result = await response.json();
+                displayResult(result);
+            } catch (err) {
+                console.error("Fetch Error:", err);
+                alert("AI Analysis Error: " + err.message);
+            } finally {
+                loading.style.display = 'none';
+                analyzeBtn.disabled = false;
+            }
+        }
+
+        function displayResult(data) {
+            console.log("Analysis Result:", data);
+            resultArea.style.display = 'block';
+            
+            let statusClass = 'status-fresh';
+            let icon = 'fa-check-circle';
+            
+            // Normalize status for class matching
+            const status = data.status.toLowerCase();
+            if (status.includes('stale')) {
+                statusClass = 'status-stale';
+                icon = 'fa-exclamation-triangle';
+                sessionStorage.setItem("foodFreshnessApproved", "true");
+            } else if (status.includes('spoiled') || status.includes('bad')) {
+                statusClass = 'status-spoiled';
+                icon = 'fa-times-circle';
+                sessionStorage.removeItem("foodFreshnessApproved");
+            } else {
+                // Fresh
+                sessionStorage.setItem("foodFreshnessApproved", "true");
+            }
+
+            resultArea.innerHTML = `
+                <div class="status-badge ${statusClass}">
+                    <i class="fas ${icon}"></i> ${data.status}
+                </div>
+                <div style="font-size: 24px; font-weight: bold; margin-bottom: 10px;">
+                    ${data.confidence}% Confidence
+                </div>
+                <p style="margin-bottom: 15px; color: #555; line-height: 1.4;">
+                    <strong>AI Analysis:</strong> ${data.description}
+                </p>
+                <div style="padding: 15px; background: #f0f2f5; border-radius: 8px; border-left: 4px solid #ff6b35;">
+                    <strong style="color: #ff6b35;">Recommendation:</strong> ${data.recommendation}
+                </div>
+                ${status.includes('fresh') || status.includes('stale') ? `
+                    <button onclick="window.location.href='donate.html'" style="background: #ff6b35; margin-top: 20px;">
+                        Proceed to Donate →
+                    </button>
+                ` : '<p style="color: #e74c3c; margin-top: 15px; font-weight: bold;">Please dispose of this food safely.</p>'}
+            `;
+            
+            // Auto-scroll to result
+            setTimeout(() => {
+                resultArea.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }, 100);
+        }
+    </script>
+</body>
+</html>

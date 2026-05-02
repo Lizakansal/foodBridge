@@ -2,205 +2,286 @@
 <html>
 
 <head>
-<title>Find Food - FoodBridge</title>
-<link rel="stylesheet" href="style.css">
+  <title>Find Food - FoodBridge</title>
+  <link rel="stylesheet" href="style.css">
 </head>
 
 <body>
 
-<!-- Override global body background for this specific page -->
-<style>
-  body {
-    background-image: url("https://images.unsplash.com/photo-1512621776951-a57141f2eefd");
-    background-attachment: fixed;
-    background-size: cover;
-    background-position: center;
-  }
-</style>
-
-<div class="overlay">
-
-<div class="container">
-
-<div class="hero">
-<h1>Available Food</h1>
-<p class="tagline">Find food donations near you</p>
-</div>
-<div class="mapContainer">
-
-<iframe
-width="100%"
-height="250"
-style="border:0"
-loading="lazy"
-allowfullscreen
-src="https://maps.google.com/maps?q=india&t=&z=5&ie=UTF8&iwloc=&output=embed">
-</iframe>
-
-</div>
-<div id="foodList" class="foodGrid">
-
-</div>
-
-</div>
-
-</div>
-
-<script>
-let userCity = "";
-let userLat = 0;
-let userLng = 0;
-
-async function getUserLocation(){
-
-  return new Promise((resolve, reject)=>{
-
-    navigator.geolocation.getCurrentPosition(
-      
-      async function(position){
-
-        userLat = position.coords.latitude;
-        userLng = position.coords.longitude;
-
-        const map = document.querySelector("iframe");
-        map.src = `https://maps.google.com/maps?q=${userLat},${userLng}&z=14&output=embed`;
-
-        try{
-
-          const geoResponse = await fetch(
-          `https://nominatim.openstreetmap.org/reverse?format=json&lat=${userLat}&lon=${userLng}`
-          );
-
-          const geoData = await geoResponse.json();
-
-          userCity =
-            geoData.address.city ||
-            geoData.address.town ||
-            geoData.address.state ||
-            "";
-
-        }catch(err){}
-
-        resolve(); // ✅ IMPORTANT
-      },
-
-      function(error){
-        console.log("Location error", error);
-        resolve(); // fallback
-      }
-
-    );
-
-  });
-
-}
-function capitalizeFirst(text){
-if(!text) return "";
-return text.charAt(0).toUpperCase() + text.slice(1);
-}
-
-function getDistance(lat1, lon1, lat2, lon2) {
-
-  const R = 6371;
-
-  const dLat = (lat2 - lat1) * Math.PI / 180;
-  const dLon = (lon2 - lon1) * Math.PI / 180;
-
-  const a =
-    Math.sin(dLat/2) * Math.sin(dLat/2) +
-    Math.cos(lat1 * Math.PI/180) *
-    Math.cos(lat2 * Math.PI/180) *
-    Math.sin(dLon/2) * Math.sin(dLon/2);
-
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-
-  return R * c;
-}
-
-async function loadFood(){
-
-// STEP 1: location detect
-await getUserLocation();
-
-// STEP 2: foods fetch
-const response = await fetch("http://localhost:5000/foods");
-const foods = await response.json();
-
-// STEP 3: sort nearby foods
-
-const container = document.getElementById("foodList");
-container.innerHTML = "";
-
-console.log("USER LOCATION:", userLat, userLng);
-  const currentTime = new Date();
-
-  foods.sort((a, b) => {
-    const timeA = new Date(a.expiryTime).getTime();
-    const timeB = new Date(b.expiryTime).getTime();
-    const validA = !isNaN(timeA);
-    const validB = !isNaN(timeB);
-
-    const aUrgent = validA && ((timeA - currentTime.getTime()) <= 2 * 60 * 60 * 1000);
-    const bUrgent = validB && ((timeB - currentTime.getTime()) <= 2 * 60 * 60 * 1000);
-    const aExpired = validA && timeA < currentTime.getTime();
-    const bExpired = validB && timeB < currentTime.getTime();
-
-    const getDist = (item) => {
-      if (!item.lat || !item.lng) return 9999;
-      return getDistance(userLat, userLng, parseFloat(item.lat), parseFloat(item.lng));
-    };
-
-    const aDist = getDist(a);
-    const bDist = getDist(b);
-
-    if (aExpired && !bExpired) return 1;
-    if (!aExpired && bExpired) return -1;
-    if (aDist < 20 && aUrgent && !(bDist < 20 && bUrgent)) return -1;
-    if (bDist < 20 && bUrgent && !(aDist < 20 && aUrgent)) return 1;
-    if (aDist < 20 && !(bDist < 20)) return -1;
-    if (bDist < 20 && !(aDist < 20)) return 1;
-    return aDist - bDist;
-  });
-
-  foods.forEach(food=>{
-    const card = document.createElement("div");
-    card.className = "foodCard";
-    const rawAddress = food.address || ((food.area || "") + ", " + (food.location || ""));
-    const mapAddress = encodeURIComponent(rawAddress.replace(/^,\s*/, "").trim());
-
-    const updateCardTime = () => {
-      const now = new Date();
-      const expiryDate = new Date(food.expiryTime);
-      let isExpired = false;
-      let isUrgent = false;
-      let timeString = "Invalid Date";
-
-      if (!isNaN(expiryDate.getTime())) {
-        const diffMs = expiryDate - now;
-        if (diffMs <= 0) {
-          isExpired = true;
-          timeString = "Expired";
-        } else {
-          const hours = Math.floor(diffMs / (1000 * 60 * 60));
-          const mins = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
-          const secs = Math.floor((diffMs % (1000 * 60)) / 1000);
-          timeString = `${hours}h ${mins}m ${secs}s`;
-          if (hours < 2 || (hours === 2 && mins === 0 && secs === 0)) {
-            isUrgent = true;
-          }
-        }
-      } else {
-        timeString = food.expiryTime;
-      }
-      return { isExpired, isUrgent, timeString };
-    };
-
-    const initialTime = updateCardTime();
-    if (initialTime.isUrgent) {
-      card.classList.add("urgentFood");
+  <!-- Override global body background for this specific page -->
+  <style>
+    body {
+      background-image: url("https://images.unsplash.com/photo-1512621776951-a57141f2eefd");
+      background-attachment: fixed;
+      background-size: cover;
+      background-position: center;
     }
 
-    card.innerHTML = `
+    .freshnessBtn {
+      background: linear-gradient(135deg, #27ae60, #2ecc71);
+      color: white;
+      border: none;
+      padding: 8px 14px;
+      border-radius: 20px;
+      font-size: 13px;
+      cursor: pointer;
+      margin-bottom: 8px;
+      width: 100%;
+      font-weight: 600;
+      transition: opacity 0.2s;
+    }
+
+    .freshnessBtn:hover {
+      opacity: 0.85;
+    }
+
+    #freshnessModal {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.6);
+      z-index: 9999;
+      align-items: center;
+      justify-content: center;
+    }
+
+    #freshnessModal.open {
+      display: flex;
+    }
+
+    .freshnessModalBox {
+      background: white;
+      border-radius: 16px;
+      padding: 30px;
+      max-width: 420px;
+      width: 90%;
+      text-align: center;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+      position: relative;
+    }
+
+    .freshnessModalBox h3 {
+      margin-bottom: 8px;
+      font-size: 22px;
+      color: #333;
+    }
+
+    .freshnessModalBadge {
+      display: inline-block;
+      padding: 6px 18px;
+      border-radius: 20px;
+      font-weight: bold;
+      font-size: 15px;
+      margin-bottom: 15px;
+    }
+
+    .freshBadge {
+      background: #d4edda;
+      color: #155724;
+    }
+
+    .staleBadge {
+      background: #fff3cd;
+      color: #856404;
+    }
+
+    .spoiledBadge {
+      background: #f8d7da;
+      color: #721c24;
+    }
+
+    .freshnessModalClose {
+      margin-top: 20px;
+      background: #ff6b35;
+      color: white;
+      border: none;
+      padding: 10px 28px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 15px;
+      font-weight: bold;
+    }
+  </style>
+
+  <div class="overlay">
+
+    <div class="container">
+
+      <div class="hero">
+        <h1>Available Food</h1>
+        <p class="tagline">Find food donations near you</p>
+      </div>
+      <div class="mapContainer">
+
+        <iframe width="100%" height="250" style="border:0" loading="lazy" allowfullscreen
+          src="https://maps.google.com/maps?q=india&t=&z=5&ie=UTF8&iwloc=&output=embed">
+        </iframe>
+
+      </div>
+      <div id="foodList" class="foodGrid">
+
+      </div>
+
+    </div>
+
+  </div>
+
+  <script>
+    let userCity = "";
+    let userLat = 0;
+    let userLng = 0;
+
+    async function getUserLocation() {
+
+      return new Promise((resolve, reject) => {
+
+        navigator.geolocation.getCurrentPosition(
+
+          async function (position) {
+
+            userLat = position.coords.latitude;
+            userLng = position.coords.longitude;
+
+            const map = document.querySelector("iframe");
+            map.src = `https://maps.google.com/maps?q=${userLat},${userLng}&z=14&output=embed`;
+
+            try {
+
+              const geoResponse = await fetch(
+                `https://nominatim.openstreetmap.org/reverse?format=json&lat=${userLat}&lon=${userLng}`
+              );
+
+              const geoData = await geoResponse.json();
+
+              userCity =
+                geoData.address.city ||
+                geoData.address.town ||
+                geoData.address.state ||
+                "";
+
+            } catch (err) { }
+
+            resolve();
+          },
+
+          function (error) {
+            console.log("Location error", error);
+            resolve(); // fallback
+          }
+
+        );
+
+      });
+
+    }
+    function capitalizeFirst(text) {
+      if (!text) return "";
+      return text.charAt(0).toUpperCase() + text.slice(1);
+    }
+
+    function getDistance(lat1, lon1, lat2, lon2) {
+
+      const R = 6371;
+
+      const dLat = (lat2 - lat1) * Math.PI / 180;
+      const dLon = (lon2 - lon1) * Math.PI / 180;
+
+      const a =
+        Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+        Math.cos(lat1 * Math.PI / 180) *
+        Math.cos(lat2 * Math.PI / 180) *
+        Math.sin(dLon / 2) * Math.sin(dLon / 2);
+
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+      return R * c;
+    }
+
+    async function loadFood() {
+
+      //  location detect
+      await getUserLocation();
+
+      //  foods fetch
+      const response = await fetch("http://localhost:5000/foods");
+      const foods = await response.json();
+
+      //  sort nearby foods
+
+      const container = document.getElementById("foodList");
+      container.innerHTML = "";
+
+      console.log("USER LOCATION:", userLat, userLng);
+      const currentTime = new Date();
+
+      foods.sort((a, b) => {
+        const timeA = new Date(a.expiryTime).getTime();
+        const timeB = new Date(b.expiryTime).getTime();
+        const validA = !isNaN(timeA);
+        const validB = !isNaN(timeB);
+
+        const aUrgent = validA && ((timeA - currentTime.getTime()) <= 2 * 60 * 60 * 1000);
+        const bUrgent = validB && ((timeB - currentTime.getTime()) <= 2 * 60 * 60 * 1000);
+        const aExpired = validA && timeA < currentTime.getTime();
+        const bExpired = validB && timeB < currentTime.getTime();
+
+        const getDist = (item) => {
+          if (!item.lat || !item.lng) return 9999;
+          return getDistance(userLat, userLng, parseFloat(item.lat), parseFloat(item.lng));
+        };
+
+        const aDist = getDist(a);
+        const bDist = getDist(b);
+
+        if (aExpired && !bExpired) return 1;
+        if (!aExpired && bExpired) return -1;
+        if (aDist < 20 && aUrgent && !(bDist < 20 && bUrgent)) return -1;
+        if (bDist < 20 && bUrgent && !(aDist < 20 && aUrgent)) return 1;
+        if (aDist < 20 && !(bDist < 20)) return -1;
+        if (bDist < 20 && !(aDist < 20)) return 1;
+        return aDist - bDist;
+      });
+
+      foods.forEach(food => {
+        const card = document.createElement("div");
+        card.className = "foodCard";
+        const rawAddress = food.address || ((food.area || "") + ", " + (food.location || ""));
+        const mapAddress = encodeURIComponent(rawAddress.replace(/^,\s*/, "").trim());
+
+        const updateCardTime = () => {
+          const now = new Date();
+          const expiryDate = new Date(food.expiryTime);
+          let isExpired = false;
+          let isUrgent = false;
+          let timeString = "Invalid Date";
+
+          if (!isNaN(expiryDate.getTime())) {
+            const diffMs = expiryDate - now;
+            if (diffMs <= 0) {
+              isExpired = true;
+              timeString = "Expired";
+            } else {
+              const hours = Math.floor(diffMs / (1000 * 60 * 60));
+              const mins = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+              const secs = Math.floor((diffMs % (1000 * 60)) / 1000);
+              timeString = `${hours}h ${mins}m ${secs}s`;
+              if (hours < 2 || (hours === 2 && mins === 0 && secs === 0)) {
+                isUrgent = true;
+              }
+            }
+          } else {
+            timeString = food.expiryTime;
+          }
+          return { isExpired, isUrgent, timeString };
+        };
+
+        const initialTime = updateCardTime();
+        if (initialTime.isUrgent) {
+          card.classList.add("urgentFood");
+        }
+
+        card.innerHTML = `
+      ${food.image ? `<img src="http://localhost:5000/uploads/${food.image}" alt="Food Image" style="width:100%; max-height:180px; object-fit:cover; border-radius:10px; margin-bottom:10px;">` : ''}
       <h3>${capitalizeFirst(food.foodName)}</h3>
       ${getDistance(userLat, userLng, parseFloat(food.lat), parseFloat(food.lng)) < 20 ? '<span class="nearbyBadge">Nearby</span>' : ''}
       <span class="urgentBadge" style="display: ${initialTime.isUrgent && !initialTime.isExpired ? 'inline-block' : 'none'}">⚡ Expiring Soon</span>
@@ -212,64 +293,89 @@ console.log("USER LOCATION:", userLat, userLng);
       <p><b>Location:</b> ${capitalizeFirst(food.location)}</p>
       <p><b>Email:</b> ${food.email}</p>
       <p><b>Contact:</b> <a href="tel:${food.contact}" class="phoneLink">${food.contact}</a></p>
+      ${food.freshnessStatus ? `
+        <button type="button" class="freshnessBtn" onclick='showFreshness(${JSON.stringify(food).replace(/'/g, "&apos;")})'>
+          🔬 View AI Freshness Report
+        </button>
+      ` : ''}
       <a href="tel:${food.contact}"><button class="callBtn">📞 Call Donor</button></a>
       <a href="https://www.google.com/maps/search/${mapAddress}" target="_blank"><button class="mapBtn">🗺 View on Map</button></a>
       <button type="button" class="reserveBtn" ${initialTime.isExpired ? 'disabled style="opacity: 0.5; background-color: #ccc; cursor: not-allowed;"' : ''}>${initialTime.isExpired ? 'Expired' : 'Reserve Food'}</button>
     `;
 
-    const reserveBtn = card.querySelector(".reserveBtn");
-    const timerElement = card.querySelector(".countdownTimer");
-    const urgentBadge = card.querySelector(".urgentBadge");
+        const reserveBtn = card.querySelector(".reserveBtn");
+        const timerElement = card.querySelector(".countdownTimer");
+        const urgentBadge = card.querySelector(".urgentBadge");
 
-    reserveBtn.addEventListener("click", () => {
-      if(!reserveBtn.disabled) {
-        reserveFood(food._id, food.quantity);
-      }
-    });
-
-    const isOldFormat = initialTime.timeString === food.expiryTime && isNaN(new Date(food.expiryTime).getTime());
-
-    if (!isOldFormat && !initialTime.isExpired) {
-      const timerInterval = setInterval(() => {
-        const { isExpired, isUrgent, timeString } = updateCardTime();
-        if (timerElement) timerElement.textContent = timeString;
-
-        if (isExpired) {
-          card.classList.remove("urgentFood");
-          if (urgentBadge) urgentBadge.style.display = "none";
-          if (reserveBtn) {
-            reserveBtn.disabled = true;
-            reserveBtn.textContent = "Expired";
-            reserveBtn.style.opacity = "0.5";
-            reserveBtn.style.backgroundColor = "#ccc";
-            reserveBtn.style.cursor = "not-allowed";
+        reserveBtn.addEventListener("click", () => {
+          if (!reserveBtn.disabled) {
+            reserveFood(food._id, food.quantity);
           }
-          clearInterval(timerInterval);
-        } else if (isUrgent) {
-          card.classList.add("urgentFood");
-          if (urgentBadge) urgentBadge.style.display = "inline-block";
+        });
+
+        const isOldFormat = initialTime.timeString === food.expiryTime && isNaN(new Date(food.expiryTime).getTime());
+
+        if (!isOldFormat && !initialTime.isExpired) {
+          const timerInterval = setInterval(() => {
+            const { isExpired, isUrgent, timeString } = updateCardTime();
+            if (timerElement) timerElement.textContent = timeString;
+
+            if (isExpired) {
+              card.classList.remove("urgentFood");
+              if (urgentBadge) urgentBadge.style.display = "none";
+              if (reserveBtn) {
+                reserveBtn.disabled = true;
+                reserveBtn.textContent = "Expired";
+                reserveBtn.style.opacity = "0.5";
+                reserveBtn.style.backgroundColor = "#ccc";
+                reserveBtn.style.cursor = "not-allowed";
+              }
+              clearInterval(timerInterval);
+            } else if (isUrgent) {
+              card.classList.add("urgentFood");
+              if (urgentBadge) urgentBadge.style.display = "inline-block";
+            }
+          }, 1000);
+        } else if (isOldFormat) {
+          if (parseInt(food.expiryTime) <= 2) {
+            card.classList.add("urgentFood");
+            if (urgentBadge) urgentBadge.style.display = "inline-block";
+          }
         }
-      }, 1000);
-    } else if (isOldFormat) {
-       if (parseInt(food.expiryTime) <= 2) {
-         card.classList.add("urgentFood");
-         if (urgentBadge) urgentBadge.style.display = "inline-block";
-       }
+
+        container.appendChild(card);
+      });
+
     }
 
-    container.appendChild(card);
-  });
+    loadFood();
 
-}
+    // Auto-refresh food list every 30 seconds
+    setInterval(() => {
+      loadFood();
+    }, 30000);
 
-loadFood();
+    function showFreshness(data) {
+      const modal = document.getElementById("freshnessModal");
+      const status = (data.freshnessStatus || "").toLowerCase();
+      let badgeClass = "freshBadge";
+      if (status.includes("stale")) badgeClass = "staleBadge";
+      else if (status.includes("spoiled") || status.includes("bad")) badgeClass = "spoiledBadge";
 
-// Auto-refresh food list every 30 seconds
-setInterval(() => {
-  loadFood();
-}, 30000);
+      document.getElementById("fm-status").textContent = data.freshnessStatus;
+      document.getElementById("fm-status").className = "freshnessModalBadge " + badgeClass;
+      document.getElementById("fm-confidence").textContent = data.freshnessConfidence + "% Confidence";
+      document.getElementById("fm-description").textContent = data.freshnessDescription;
+      document.getElementById("fm-recommendation").textContent = "Recommendation: " + data.freshnessRecommendation;
+      document.getElementById("fm-recommendation").style.color = data.freshnessRecommendation === "Safe to donate" ? "#27ae60" : "#e74c3c";
+      modal.classList.add("open");
+    }
 
-let selectedFoodId = "";
+    function closeFreshnessModal() {
+      document.getElementById("freshnessModal").classList.remove("open");
+    }
+
+    let selectedFoodId = "";
     let maxQty = 0;
 
     function reserveFood(foodId, quantity) {
@@ -277,7 +383,7 @@ let selectedFoodId = "";
       selectedFoodId = foodId;
       maxQty = quantity;
 
-       document.getElementById("mainFormFields").style.display = "block";
+      document.getElementById("mainFormFields").style.display = "block";
       document.getElementById("otpSection").style.display = "none";
       document.getElementById("reservePopup").style.display = "flex";
     }
@@ -289,7 +395,7 @@ let selectedFoodId = "";
 
     async function submitReservation() {
 
-     const name = document.getElementById("userName").value.trim();
+      const name = document.getElementById("userName").value.trim();
       const email = document.getElementById("userEmail").value.trim();
       const phone = document.getElementById("userPhone").value.trim();
       const idType = document.getElementById("idType").value;
@@ -319,17 +425,17 @@ let selectedFoodId = "";
         const otpResp = await fetch("http://localhost:5000/send-otp-reserve", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ phone })
+          body: JSON.stringify({ email })
         });
-        
+
         const otpData = await otpResp.json();
         if (otpData.error) {
           alert("Could not send OTP: " + (otpData.details || otpData.error));
           return;
         }
 
-        alert("OTP sent to " + phone + "!");
-        
+        alert("OTP sent to " + email + "!");
+
         // Hide main form and show OTP section
         document.getElementById("mainFormFields").style.display = "none";
         document.getElementById("otpSection").style.display = "block";
@@ -371,7 +477,7 @@ let selectedFoodId = "";
           return;
         }
 
-        alert("Verification request sent successfully!");
+        alert("Approval request sent to Donor!");
         closePopup();
       } catch (err) {
         alert("Error while reserving food");
@@ -384,7 +490,8 @@ let selectedFoodId = "";
     <div class="popupContent">
 
       <h2>Reserve Food</h2>
-      <p style="font-size: 13px; color: #888; margin-top: -8px; margin-bottom: 12px;">🏢 Only registered NGOs can reserve food</p>
+      <p style="font-size: 13px; color: #888; margin-top: -8px; margin-bottom: 12px;">🏢 Only registered NGOs can
+        reserve food</p>
 
       <div id="mainFormFields">
         <input type="text" id="userName" placeholder="NGO / Organization Name">
@@ -401,7 +508,8 @@ let selectedFoodId = "";
           <option value="Other">Other Official Document</option>
         </select>
 
-        <label style="font-size: 13px; color: #666; margin-bottom: 4px; display:block;">Upload ID Proof (image/pdf)</label>
+        <label style="font-size: 13px; color: #666; margin-bottom: 4px; display:block;">Upload ID Proof
+          (image/pdf)</label>
         <input type="file" id="idPhoto" accept="image/*,.pdf">
 
         <input type="number" id="reserveQty" placeholder="Quantity">
@@ -412,7 +520,8 @@ let selectedFoodId = "";
 
       <div id="otpSection" style="display:none; text-align: center;">
         <p style="margin-bottom: 15px;">Please enter the 6-digit OTP sent to your phone</p>
-        <input type="text" id="enteredOtp" placeholder="Enter OTP Here" maxlength="6" style="text-align: center; font-size: 20px; letter-spacing: 5px;">
+        <input type="text" id="enteredOtp" placeholder="Enter OTP Here" maxlength="6"
+          style="text-align: center; font-size: 20px; letter-spacing: 5px;">
         <button onclick="verifyOtpAndSubmit()">Verify & Submit Request</button>
         <button onclick="closePopup()">Cancel</button>
       </div>
@@ -420,5 +529,18 @@ let selectedFoodId = "";
     </div>
   </div>
 
+  <!-- Freshness Modal -->
+  <div id="freshnessModal">
+    <div class="freshnessModalBox">
+      <h3>🤖 AI Freshness Analysis</h3>
+      <div id="fm-status" class="freshnessModalBadge freshBadge">Fresh</div>
+      <div id="fm-confidence" style="font-size: 20px; font-weight: bold; margin-bottom: 12px; color: #333;"></div>
+      <p id="fm-description" style="color: #555; line-height: 1.5; margin-bottom: 14px; font-size: 14px;"></p>
+      <p id="fm-recommendation" style="font-weight: bold; font-size: 15px;"></p>
+      <button class="freshnessModalClose" onclick="closeFreshnessModal()">Close</button>
+    </div>
+  </div>
+
 </body>
+
 </html>

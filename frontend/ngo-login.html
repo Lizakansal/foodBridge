@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NGO Dashboard Login - FoodBridge</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f4f7f6;
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+
+        .login-container {
+            background: white;
+            padding: 40px;
+            border-radius: 10px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            width: 100%;
+            max-width: 400px;
+            text-align: center;
+        }
+
+        h2 {
+            color: #2c3e50;
+            margin-bottom: 20px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+            text-align: left;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #555;
+            font-weight: bold;
+        }
+
+        input[type="email"],
+        input[type="text"] {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            box-sizing: border-box;
+            font-size: 16px;
+        }
+
+        button {
+            width: 100%;
+            padding: 12px;
+            background-color: #27ae60;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        button:hover {
+            background-color: #219150;
+        }
+
+        #otpSection {
+            display: none;
+            margin-top: 20px;
+        }
+
+        .error-message {
+            color: #e74c3c;
+            margin-top: 10px;
+            font-size: 14px;
+        }
+
+        .success-message {
+            color: #27ae60;
+            margin-top: 10px;
+            font-size: 14px;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="login-container">
+        <h2>NGO Dashboard Login</h2>
+        <p style="color: #666; font-size: 14px; margin-bottom: 20px;">Use the email you provided during food
+            reservation.</p>
+
+        <div id="emailSection">
+            <div class="form-group">
+                <label for="email">Email Address</label>
+                <input type="email" id="email" placeholder="Enter your email" required>
+            </div>
+            <button onclick="sendOTP()">Send OTP</button>
+        </div>
+
+        <div id="otpSection">
+            <div class="form-group">
+                <label for="otp">Enter OTP</label>
+                <input type="text" id="otp" placeholder="Enter 6-digit OTP" required>
+            </div>
+            <button onclick="verifyOTP()">Verify & Login</button>
+        </div>
+
+        <div id="message" class=""></div>
+    </div>
+
+    <script>
+        const API_URL = "http://localhost:5000";
+
+        async function sendOTP() {
+            const email = document.getElementById("email").value;
+            const msgDiv = document.getElementById("message");
+
+            if (!email) {
+                msgDiv.innerText = "Please enter your email.";
+                msgDiv.className = "error-message";
+                return;
+            }
+
+            msgDiv.innerText = "Sending OTP...";
+            msgDiv.className = "";
+
+            try {
+                const response = await fetch(`${API_URL}/ngo-send-otp`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ email })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    document.getElementById("emailSection").style.display = "none";
+                    document.getElementById("otpSection").style.display = "block";
+                    msgDiv.innerText = "OTP sent successfully to your email.";
+                    msgDiv.className = "success-message";
+                } else {
+                    msgDiv.innerText = data.error || "Failed to send OTP.";
+                    msgDiv.className = "error-message";
+                }
+            } catch (error) {
+                msgDiv.innerText = "Server error. Please try again later.";
+                msgDiv.className = "error-message";
+            }
+        }
+
+        async function verifyOTP() {
+            const email = document.getElementById("email").value;
+            const otp = document.getElementById("otp").value;
+            const msgDiv = document.getElementById("message");
+
+            if (!otp) {
+                msgDiv.innerText = "Please enter the OTP.";
+                msgDiv.className = "error-message";
+                return;
+            }
+
+            msgDiv.innerText = "Verifying...";
+            msgDiv.className = "";
+
+            try {
+                const response = await fetch(`${API_URL}/ngo-verify-otp`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ email, otp })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    msgDiv.innerText = "Login successful! Redirecting...";
+                    msgDiv.className = "success-message";
+
+                    // Save email to localStorage for dashboard
+                    localStorage.setItem("ngoEmail", email);
+
+                    // Redirect to dashboard
+                    setTimeout(() => {
+                        window.location.href = "ngo-dashboard.html";
+                    }, 1000);
+                } else {
+                    msgDiv.innerText = data.error || "Invalid OTP.";
+                    msgDiv.className = "error-message";
+                }
+            } catch (error) {
+                msgDiv.innerText = "Server error. Please try again later.";
+                msgDiv.className = "error-message";
+            }
+        }
+    </script>
+
+</body>
+
+</html>
